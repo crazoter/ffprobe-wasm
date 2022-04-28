@@ -1,0 +1,25 @@
+emmake make fftools/ffprobe.o fftools/cmdutils.o
+emcc --bind \
+	-O3 \
+	-L/opt/ffmpeg/lib \
+	-I/opt/ffmpeg/include/ \
+	-s EXTRA_EXPORTED_RUNTIME_METHODS="[FS, cwrap, ccall, getValue, setValue, writeAsciiToMemory]" \
+	-s INITIAL_MEMORY=268435456 \
+	-lavcodec -lavformat -lavfilter -lavdevice -lswresample -lswscale -lavutil -lm -lx264 \
+	-pthread \
+	-lworkerfs.js \
+	-o ffprobe.js \
+        ffprobe.o cmdutils.o
+
+cd /tmp/ffmpeg-4.4.2/fftools
+
+1. Have to make modifications to ffprobe_g.js:
+	a. expand it out
+	b. add a check before SharedArrayBuffer is used (optional)
+
+the problem is w/o sharedarraybuffer, won't be able to 
+using sharedarraybuffer means some of the mobile based browsers won't be able to support it
+
+https://caniuse.com/sharedarraybuffer
+
+but seems like a reasonable trade-off

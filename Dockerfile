@@ -1,19 +1,25 @@
-FROM emscripten/emsdk:2.0.11 as build
+FROM emscripten/emsdk:3.1.8 as build
 
-ARG FFMPEG_VERSION=4.3.1
-ARG X264_VERSION=20170226-2245-stable
+# Warning, FFMPEG 5 is not supported yet; will throw compilation errors.
+# See https://github.com/opencv/opencv/issues/21711
+ARG FFMPEG_VERSION=4.4.2
+# Specify the commit SHA to be fetched from https://code.videolan.org/videolan/x264
+ARG X264_COMMIT_SHA=5db6aa6cab1b146e07b60cc1736a01f21da01154
 
 ARG PREFIX=/opt/ffmpeg
 ARG MAKEFLAGS="-j4"
 
-RUN apt-get update && apt-get install -y autoconf libtool build-essential
+RUN apt-get update && apt-get install -y autoconf libtool build-essential git
 
 # libx264
-RUN cd /tmp && \
-  wget https://download.videolan.org/pub/videolan/x264/snapshots/x264-snapshot-${X264_VERSION}.tar.bz2 && \
-  tar xvfj x264-snapshot-${X264_VERSION}.tar.bz2
+# https://stackoverflow.com/questions/3489173/how-to-clone-git-repository-with-specific-revision-changeset
+RUN mkdir /tmp/x264-stable && \
+  cd /tmp/x264-stable && \
+  git init && git remote add origin https://code.videolan.org/videolan/x264.git && \
+  git fetch origin ${X264_COMMIT_SHA} --depth=1 && \
+  git reset --hard FETCH_HEAD
 
-RUN cd /tmp/x264-snapshot-${X264_VERSION} && \
+RUN cd /tmp/x264-stable && \
   emconfigure ./configure \
   --prefix=${PREFIX} \
   --host=i686-gnu \
@@ -22,7 +28,7 @@ RUN cd /tmp/x264-snapshot-${X264_VERSION} && \
   --disable-asm \
   --extra-cflags="-s USE_PTHREADS=1"
 
-RUN cd /tmp/x264-snapshot-${X264_VERSION} && \
+RUN cd /tmp/x264-stable && \
   emmake make && emmake make install 
 
 # Get ffmpeg source.
@@ -44,21 +50,7 @@ RUN cd /tmp/ffmpeg-${FFMPEG_VERSION} && \
   --disable-x86asm \
   --disable-inline-asm \
   --disable-stripping \
-  --disable-programs \
   --disable-doc \
-  --disable-all \
-  --enable-avcodec \
-  --enable-avformat \
-  --enable-avfilter \
-  --enable-avdevice \
-  --enable-avutil \
-  --enable-swresample \
-  --enable-postproc \
-  --enable-swscale \
-  --enable-protocol=file \
-  --enable-decoder=h264,aac,pcm_s16le \
-  --enable-demuxer=mov,matroska \
-  --enable-muxer=mp4 \
   --enable-gpl \
   --enable-libx264 \
   --extra-cflags="$CFLAGS" \
@@ -77,8 +69,7 @@ RUN cd /tmp/ffmpeg-${FFMPEG_VERSION} && \
   emmake make -j4 && \
   emmake make install
 
-
-COPY ./src/ffprobe-wasm-wrapper.cpp /build/src/ffprobe-wasm-wrapper.cpp
+# COPY ./src/ffprobe-wasm-wrapper.cpp /build/src/ffprobe-wasm-wrapper.cpp
 COPY ./Makefile /build/Makefile
 
 WORKDIR /build

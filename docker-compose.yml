@@ -1,7 +1,10 @@
-version: '3'
+version: '3.9'
 
 services:
   ffprobe-wasm:
     build: .
     volumes:
       - "./:/build"
+      - type: bind
+        source: ./src
+        target: /build/src:
